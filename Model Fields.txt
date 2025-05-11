@@ -1,0 +1,34 @@
+User Model :
+	
+
+Payment Model :
+	
+	1 - id (int)
+	2 - User (int)
+	3 - Price (int)
+	4 - Payment Date (Date)  => Auto (When Created)
+	5 - Duration (str)
+	6 - Paid Method (str)
+	7 - Payment Status (str)
+	8 - Full Name (str)
+
+Lockers Model :
+
+	1 - id (int)
+	2 - Is VIP (bool) 
+	3 - Is Open (bool) 
+	4 - Log (List of (Full Name, Date Time))
+	5 - User (int) => Null
+	6 - Full Name (str) => Null	
+
+Log Model : 
+	
+	1 - id (int)
+	2 - User (int)
+	3 - Full Name (int)
+	4 - Is Online (bool) => Default True 
+	5 - Entry Time (Date Time) => Auto (When Created)
+	5 - Exit Time (Date Time) => Auto (When Is Online Changes To False)
+
+	
+Settings Model :

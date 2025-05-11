@@ -1,0 +1,71 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.db.models import Q
+from .models import Payment
+from .serializers import PaymentSerializer
+
+
+class PaymentAPIView(APIView):
+    def get(self, request):
+        payment_id = request.query_params.get('id')
+        if payment_id:
+            try:
+                payment = Payment.objects.get(id=payment_id)
+                serializer = PaymentSerializer(payment)
+                return Response(serializer.data)
+            except Payment.DoesNotExist:
+                return Response({'error': 'Payment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        filters = Q()
+
+        # Exact match filters
+        for field in ['user', 'price', 'payment_date']:
+            value = request.query_params.get(field)
+            if value is not None:
+                filters &= Q(**{field: value})
+
+        # Partial match filters
+        for field in ['duration', 'paid_method', 'payment_status', 'full_name']:
+            value = request.query_params.get(field)
+            if value is not None:
+                filters &= Q(**{f"{field}__icontains": value})
+
+        payments = Payment.objects.filter(filters)
+        serializer = PaymentSerializer(payments, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = PaymentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request):
+        payment_id = request.query_params.get('id')
+        if not payment_id:
+            return Response({'error': 'ID query param required for PATCH.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payment = Payment.objects.get(id=payment_id)
+        except Payment.DoesNotExist:
+            return Response({'error': 'Payment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = PaymentSerializer(payment, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request):
+        payment_id = request.query_params.get('id')
+        if not payment_id:
+            return Response({'error': 'ID query param required for DELETE.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payment = Payment.objects.get(id=payment_id)
+            payment.delete()
+            return Response({'message': 'Payment deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+        except Payment.DoesNotExist:
+            return Response({'error': 'Payment not found.'}, status=status.HTTP_404_NOT_FOUND)
