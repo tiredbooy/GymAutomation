@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     'DataImporterModule',
     'rest_framework',
     'corsheaders',
-    'pyodbc'
+    'pyodbc',
+    'pillow_avif'
 ]
 
 MIDDLEWARE = [
@@ -85,7 +86,7 @@ WSGI_APPLICATION = 'GymAutomation.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'GymAutomation',
+        'NAME': 'GymAutomationRestoredDataBase',
         'USER': 'postgres',
         'PASSWORD': '138461011e',
         'HOST': 'localhost',

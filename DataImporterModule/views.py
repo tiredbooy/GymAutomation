@@ -1,22 +1,46 @@
 import json
 import pyodbc
+import io
+import base64
+from PIL import Image
+import pillow_avif  # Ensure pillow-avif-plugin is installed
+
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+
 from UserModule.models import GenMembershipType, GenPersonRole, GenShift, SecUser, GenPerson, GenMember
-import os
-from datetime import datetime
-from django.http import JsonResponse, FileResponse, HttpResponseServerError, HttpResponseBadRequest
-from django.conf import settings
-import subprocess
-from rest_framework.views import APIView
-from django.core.management import call_command
-from rest_framework.decorators import api_view
+
+
+def convert_hex_jpeg_to_avif(hex_str):
+    if not hex_str:
+        return None
+
+    try:
+        # If the input is already bytes (e.g. from pyodbc VARBINARY), use it directly
+        if isinstance(hex_str, bytes):
+            img_bytes = hex_str
+        elif isinstance(hex_str, str):
+            img_bytes = bytes.fromhex(hex_str[2:] if hex_str.startswith("0x") else hex_str)
+        else:
+            return None  # Unsupported type
+
+        # Load and convert the image
+        image = Image.open(io.BytesIO(img_bytes))
+        avif_buffer = io.BytesIO()
+        image.save(avif_buffer, format="AVIF")
+        return avif_buffer.getvalue()
+
+    except Exception as e:
+        print(f"Image conversion error: {e}")
+        return None
+
+
 
 class DataImportFromJsonConfigAPIView(APIView):
     def post(self, request):
         try:
-            # Step 1: Parse the request  data to get server and database info
             data = json.loads(request.body)
             server = data.get('SERVER')
             database = data.get('DATABASE')
@@ -24,7 +48,6 @@ class DataImportFromJsonConfigAPIView(APIView):
             if not server or not database:
                 return JsonResponse({"error": "SERVER and DATABASE must be provided"}, status=400)
 
-            # Step 2: Connect to the SQL Server using pyodbc
             conn = pyodbc.connect(
                 f"DRIVER={{ODBC Driver 17 for SQL Server}};"
                 f"SERVER={server};"
@@ -33,9 +56,7 @@ class DataImportFromJsonConfigAPIView(APIView):
             )
             cursor = conn.cursor()
 
-            # Step 3: Import data into Django models
-
-            # Load GenShift (all rows)
+            # Import GenShift
             cursor.execute("SELECT ShiftID, ShiftDesc FROM Gen_Shift")
             for row in cursor.fetchall():
                 GenShift.objects.update_or_create(
@@ -43,7 +64,7 @@ class DataImportFromJsonConfigAPIView(APIView):
                     defaults={'shift_desc': row.ShiftDesc}
                 )
 
-            # Load GenPersonRole (all rows)
+            # Import GenPersonRole
             cursor.execute("SELECT RoleID, RoleDesc FROM Gen_PersonRole")
             for row in cursor.fetchall():
                 GenPersonRole.objects.update_or_create(
@@ -51,7 +72,7 @@ class DataImportFromJsonConfigAPIView(APIView):
                     defaults={'role_desc': row.RoleDesc}
                 )
 
-            # Load GenMembershipType (all rows)
+            # Import GenMembershipType
             cursor.execute("SELECT MembershipTypeID, MembershipTypeDesc FROM Gen_MembershipType")
             for row in cursor.fetchall():
                 GenMembershipType.objects.update_or_create(
@@ -59,17 +80,15 @@ class DataImportFromJsonConfigAPIView(APIView):
                     defaults={'membership_type_desc': row.MembershipTypeDesc}
                 )
 
-            # Load SecUser (all rows)
+            # Import SecUser
             cursor.execute("""
                 SELECT UserID, PersonID, UserName, UPassword, IsAdmin, ShiftID, 
                 IsActive, CreationDate, CreationTime
                 FROM Sec_Users
             """)
             for row in cursor.fetchall():
-                # We no longer parse datetime, just store it as a string
                 creation_datetime = f"{row.CreationDate} {row.CreationTime}" if row.CreationDate and row.CreationTime else None
 
-                # Update or create the SecUser
                 SecUser.objects.update_or_create(
                     user_id=row.UserID,
                     defaults={
@@ -83,7 +102,7 @@ class DataImportFromJsonConfigAPIView(APIView):
                     }
                 )
 
-            # Load GenPerson (all rows)
+            # Import GenPerson with AVIF conversion
             cursor.execute("""
                 SELECT PersonID, FirstName, LastName, FullName, FatherName, Gender, NationalCode, 
                 Nidentity, PersonImage, ThumbnailImage, BirthDate, Tel, Mobile, Email, 
@@ -92,19 +111,13 @@ class DataImportFromJsonConfigAPIView(APIView):
                 FROM Gen_Person
             """)
             for row in cursor.fetchall():
-                # Convert Gender field
-                if row.Gender == 0:
-                    gender = 'F'  # Female
-                elif row.Gender == 1:
-                    gender = 'M'  # Male
-                else:
-                    gender = 'O'  # Other
-
-                # Handle date/time as strings, no parsing
+                gender = {0: 'F', 1: 'M'}.get(row.Gender, 'O')
                 creation_datetime = f"{row.CreationDate} {row.CreationTime}" if row.CreationDate and row.CreationTime else None
                 modification_datetime = f"{row.ModificationTime}" if row.ModificationTime else None
 
-                # Update or create the GenPerson
+                person_image_avif = convert_hex_jpeg_to_avif(row.PersonImage)
+                thumbnail_image_avif = convert_hex_jpeg_to_avif(row.ThumbnailImage)
+
                 GenPerson.objects.update_or_create(
                     person_id=row.PersonID,
                     defaults={
@@ -115,8 +128,8 @@ class DataImportFromJsonConfigAPIView(APIView):
                         'gender': gender,
                         'national_code': row.NationalCode,
                         'nidentity': row.Nidentity,
-                        'person_image': row.PersonImage,
-                        'thumbnail_image': row.ThumbnailImage,
+                        'person_image': person_image_avif,
+                        'thumbnail_image': thumbnail_image_avif,
                         'birth_date': row.BirthDate,
                         'tel': row.Tel,
                         'mobile': row.Mobile,
@@ -138,34 +151,31 @@ class DataImportFromJsonConfigAPIView(APIView):
                     }
                 )
 
-            # Load GenMember (all rows)
+            # Import GenMember
             cursor.execute("""
-                SELECT [MemberID], [CardNo], [PersonID], [RoleID], [UserID], [ShiftID], 
-                       [IsBlackList], [BoxRadifNo], [HasFinger], [MembershipDate], [MembershipTime], 
-                       [Modifier], [Modificationtime], [IsFamily], [MaxDebit], [Minutiae], 
-                       [Minutiae2], [Minutiae3], [Salary], [FaceTmpl1], [FaceTmpl2], [FaceTmpl3], 
-                       [FaceTmpl4], [FaceTmpl5]
-                FROM [Gen_Members]
+                SELECT MemberID, CardNo, PersonID, RoleID, UserID, ShiftID, 
+                       IsBlackList, BoxRadifNo, HasFinger, MembershipDate, MembershipTime, 
+                       Modifier, Modificationtime, IsFamily, MaxDebit, Minutiae, 
+                       Minutiae2, Minutiae3, Salary, FaceTmpl1, FaceTmpl2, FaceTmpl3, 
+                       FaceTmpl4, FaceTmpl5
+                FROM Gen_Members
             """)
             for row in cursor.fetchall():
-                # Format Membership Date and Time to String
                 membership_datetime = f"{row.MembershipDate} {row.MembershipTime}" if row.MembershipDate and row.MembershipTime else None
                 modification_datetime = f"{row.Modificationtime}" if row.Modificationtime else None
 
-                # Get instances of related models
                 role_instance = GenPersonRole.objects.get(role_id=row.RoleID)
                 user_instance = SecUser.objects.get(user_id=row.UserID)
                 shift_instance = GenShift.objects.get(shift_id=row.ShiftID)
 
-                # Update or create the GenMember
                 GenMember.objects.update_or_create(
                     member_id=row.MemberID,
                     defaults={
                         'card_no': row.CardNo,
                         'person_id': row.PersonID,
-                        'role_id': role_instance,  # Use the actual instance here
-                        'user_id': user_instance.user_id,  # Pass the user_id (not the whole instance)
-                        'shift_id': shift_instance.shift_id,  # Pass the shift_id (not the whole instance)
+                        'role_id': role_instance,
+                        'user_id': user_instance.user_id,
+                        'shift_id': shift_instance.shift_id,
                         'is_black_list': row.IsBlackList,
                         'box_radif_no': row.BoxRadifNo,
                         'has_finger': row.HasFinger,
@@ -186,11 +196,8 @@ class DataImportFromJsonConfigAPIView(APIView):
                     }
                 )
 
-            # Close the connection
             conn.close()
-
             return Response({"message": "✅ Data imported successfully."})
 
         except Exception as e:
             return Response({"error": f"❌ Import failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
