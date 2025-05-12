@@ -47,7 +47,7 @@ class DynamicAPIView(APIView):
             return None
 
     def get(self, request):
-        """Handle GET request with filtering."""
+        """Handle GET request with filtering and pagination."""
         action = request.query_params.get('action')
         model = self.get_model(action)
         if not model:
@@ -62,27 +62,53 @@ class DynamicAPIView(APIView):
         elif action == 'user':
             filter_fields = ['user_id', 'person', 'username', 'is_admin', 'shift', 'is_active']
         elif action == 'person':
-            filter_fields = ['person_id', 'first_name', 'last_name', 'full_name', 'father_name', 'gender', 'national_code',
-                             'nidentity', 'person_image', 'thumbnail_image', 'birth_date', 'tel', 'mobile', 'email', 'has_insurance',
+            filter_fields = ['person_id', 'first_name', 'last_name', 'full_name', 'father_name', 'gender',
+                             'national_code',
+                             'nidentity', 'person_image', 'thumbnail_image', 'birth_date', 'tel', 'mobile', 'email',
+                             'has_insurance',
                              'user']
         elif action == 'role':
             filter_fields = ['role_id', 'role_desc']
         elif action == 'member':
-            filter_fields = ['member_id', 'card_no', 'person', 'role_id', 'user', 'shift', 'is_black_list', 'membership_datetime',
-                             'minutiae', 'minutiae2', 'minutiae3', 'face_template_1', 'face_template_2', 'face_template_3',
+            filter_fields = ['member_id', 'card_no', 'person', 'role_id', 'user', 'shift', 'is_black_list',
+                             'membership_datetime',
+                             'minutiae', 'minutiae2', 'minutiae3', 'face_template_1', 'face_template_2',
+                             'face_template_3',
                              'face_template_4', 'face_template_5']
         elif action == 'membership_type':
             filter_fields = ['membership_type_id', 'membership_type_desc']
 
-        # Apply the filters based on query params
+        # Apply filters from query params
         for field in filter_fields:
             value = request.query_params.get(field)
             if value is not None:
                 filters &= Q(**{field: value})
 
-        objects = model.objects.filter(filters)
-        serializer = self.get_serializer(model)(objects, many=True)
-        return Response(serializer.data)
+        # Apply filtering
+        queryset = model.objects.filter(filters)
+
+        # Handle pagination
+        try:
+            page = int(request.query_params.get('page', 1))
+            item_per_page = int(request.query_params.get('item_per_page', 10))
+        except ValueError:
+            return Response({'error': 'Invalid pagination values'}, status=status.HTTP_400_BAD_REQUEST)
+
+        total_items = queryset.count()
+        total_pages = (total_items + item_per_page - 1) // item_per_page
+
+        start = (page - 1) * item_per_page
+        end = start + item_per_page
+        paginated_queryset = queryset[start:end]
+
+        serializer = self.get_serializer(model)(paginated_queryset, many=True)
+
+        return Response({
+            'total_items': total_items,
+            'total_pages': total_pages,
+            'current_page': page,
+            'items': serializer.data
+        })
 
     def post(self, request):
         """Handle POST request to create objects."""

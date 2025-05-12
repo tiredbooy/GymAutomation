@@ -32,7 +32,21 @@ class PaymentAPIView(APIView):
                 filters &= Q(**{f"{field}__icontains": value})
 
         payments = Payment.objects.filter(filters)
-        serializer = PaymentSerializer(payments, many=True)
+
+        # Pagination
+        try:
+            page = int(request.query_params.get('page', 1))
+            item_per_page = int(request.query_params.get('item_per_page', 10))
+            if page < 1 or item_per_page < 1:
+                raise ValueError
+        except ValueError:
+            return Response({'error': 'Invalid pagination parameters'}, status=status.HTTP_400_BAD_REQUEST)
+
+        start = (page - 1) * item_per_page
+        end = start + item_per_page
+        paginated_payments = payments[start:end]
+
+        serializer = PaymentSerializer(paginated_payments, many=True)
         return Response(serializer.data)
 
     def post(self, request):
