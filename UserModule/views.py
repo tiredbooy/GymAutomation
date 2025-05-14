@@ -87,18 +87,25 @@ class DynamicAPIView(APIView):
         # Apply filtering
         queryset = model.objects.filter(filters)
 
+        # Apply ordering
+        order_by = request.query_params.get('order_by')
+        if order_by == 'latest':
+            queryset = queryset.order_by('-id')
+        elif order_by == 'earlier':
+            queryset = queryset.order_by('id')
+
         # Handle pagination
         try:
             page = int(request.query_params.get('page', 1))
-            item_per_page = int(request.query_params.get('item_per_page', 10))
+            limit = int(request.query_params.get('limit', 10))
         except ValueError:
             return Response({'error': 'Invalid pagination values'}, status=status.HTTP_400_BAD_REQUEST)
 
         total_items = queryset.count()
-        total_pages = (total_items + item_per_page - 1) // item_per_page
+        total_pages = (total_items + limit - 1) // limit
 
-        start = (page - 1) * item_per_page
-        end = start + item_per_page
+        start = (page - 1) * limit
+        end = start + limit
         paginated_queryset = queryset[start:end]
 
         serializer = self.get_serializer(model)(paginated_queryset, many=True)

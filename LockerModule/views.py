@@ -29,14 +29,14 @@ class LockerAPIView(APIView):
         # Pagination
         try:
             page = int(request.query_params.get('page', 1))
-            item_per_page = int(request.query_params.get('item_per_page', 10))
-            if page < 1 or item_per_page < 1:
+            limit = int(request.query_params.get('limit', 10))
+            if page < 1 or limit < 1:
                 raise ValueError
         except ValueError:
             return Response({'error': 'Invalid pagination parameters'}, status=status.HTTP_400_BAD_REQUEST)
 
-        start = (page - 1) * item_per_page
-        end = start + item_per_page
+        start = (page - 1) * limit
+        end = start + limit
         paginated_lockers = lockers[start:end]
 
         serializer = LockerSerializer(paginated_lockers, many=True)
