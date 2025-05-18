@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'LogModule',
     'LockerModule',
     'DataImporterModule',
+    "ImageURLModule",
     'rest_framework',
     'corsheaders',
     'pyodbc',
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

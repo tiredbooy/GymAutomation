@@ -3,7 +3,7 @@ import pyodbc
 import io
 import base64
 from PIL import Image
-import pillow_avif  # Ensure pillow-avif-plugin is installed
+import pillow_avif
 
 from django.http import JsonResponse
 from rest_framework.views import APIView
@@ -12,26 +12,19 @@ from rest_framework import status
 
 from UserModule.models import GenMembershipType, GenPersonRole, GenShift, SecUser, GenPerson, GenMember
 
-
-def convert_hex_jpeg_to_avif(hex_str):
-    if not hex_str:
+def convert_binary_image_to_avif(image_blob):
+    """
+    Convert raw binary image (e.g. JPEG) to AVIF format.
+    """
+    if not image_blob:
         return None
 
     try:
-        # If the input is already bytes (e.g. from pyodbc VARBINARY), use it directly
-        if isinstance(hex_str, bytes):
-            img_bytes = hex_str
-        elif isinstance(hex_str, str):
-            img_bytes = bytes.fromhex(hex_str[2:] if hex_str.startswith("0x") else hex_str)
-        else:
-            return None  # Unsupported type
-
-        # Load and convert the image
-        image = Image.open(io.BytesIO(img_bytes))
+        image = Image.open(io.BytesIO(image_blob))
+        image = image.convert("RGB")  # Ensure compatibility
         avif_buffer = io.BytesIO()
         image.save(avif_buffer, format="AVIF")
         return avif_buffer.getvalue()
-
     except Exception as e:
         print(f"Image conversion error: {e}")
         return None
@@ -115,8 +108,9 @@ class DataImportFromJsonConfigAPIView(APIView):
                 creation_datetime = f"{row.CreationDate} {row.CreationTime}" if row.CreationDate and row.CreationTime else None
                 modification_datetime = f"{row.ModificationTime}" if row.ModificationTime else None
 
-                person_image_avif = convert_hex_jpeg_to_avif(row.PersonImage)
-                thumbnail_image_avif = convert_hex_jpeg_to_avif(row.ThumbnailImage)
+                # ✅ Fixed: Use binary-safe conversion
+                person_image_avif = convert_binary_image_to_avif(row.PersonImage)
+                thumbnail_image_avif = convert_binary_image_to_avif(row.ThumbnailImage)
 
                 GenPerson.objects.update_or_create(
                     person_id=row.PersonID,
