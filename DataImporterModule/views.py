@@ -1,9 +1,5 @@
 import json
 import pyodbc
-import io
-import base64
-from PIL import Image
-import pillow_avif
 
 from django.http import JsonResponse
 from rest_framework.views import APIView
@@ -11,24 +7,6 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from UserModule.models import GenMembershipType, GenPersonRole, GenShift, SecUser, GenPerson, GenMember
-
-def convert_binary_image_to_avif(image_blob):
-    """
-    Convert raw binary image (e.g. JPEG) to AVIF format.
-    """
-    if not image_blob:
-        return None
-
-    try:
-        image = Image.open(io.BytesIO(image_blob))
-        image = image.convert("RGB")  # Ensure compatibility
-        avif_buffer = io.BytesIO()
-        image.save(avif_buffer, format="AVIF")
-        return avif_buffer.getvalue()
-    except Exception as e:
-        print(f"Image conversion error: {e}")
-        return None
-
 
 
 class DataImportFromJsonConfigAPIView(APIView):
@@ -95,7 +73,7 @@ class DataImportFromJsonConfigAPIView(APIView):
                     }
                 )
 
-            # Import GenPerson with AVIF conversion
+            # Import GenPerson (images untouched)
             cursor.execute("""
                 SELECT PersonID, FirstName, LastName, FullName, FatherName, Gender, NationalCode, 
                 Nidentity, PersonImage, ThumbnailImage, BirthDate, Tel, Mobile, Email, 
@@ -108,10 +86,6 @@ class DataImportFromJsonConfigAPIView(APIView):
                 creation_datetime = f"{row.CreationDate} {row.CreationTime}" if row.CreationDate and row.CreationTime else None
                 modification_datetime = f"{row.ModificationTime}" if row.ModificationTime else None
 
-                # ✅ Fixed: Use binary-safe conversion
-                person_image_avif = convert_binary_image_to_avif(row.PersonImage)
-                thumbnail_image_avif = convert_binary_image_to_avif(row.ThumbnailImage)
-
                 GenPerson.objects.update_or_create(
                     person_id=row.PersonID,
                     defaults={
@@ -122,8 +96,8 @@ class DataImportFromJsonConfigAPIView(APIView):
                         'gender': gender,
                         'national_code': row.NationalCode,
                         'nidentity': row.Nidentity,
-                        'person_image': person_image_avif,
-                        'thumbnail_image': thumbnail_image_avif,
+                        'person_image': row.PersonImage,            # 👈 untouched
+                        'thumbnail_image': row.ThumbnailImage,      # 👈 untouched
                         'birth_date': row.BirthDate,
                         'tel': row.Tel,
                         'mobile': row.Mobile,
