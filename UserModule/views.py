@@ -10,6 +10,7 @@ from .serializers import (
 )
 
 
+
 class DynamicAPIView(APIView):
 
     def get_model(self, action):
