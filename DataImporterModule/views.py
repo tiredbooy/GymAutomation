@@ -1,12 +1,25 @@
 import json
 import pyodbc
-
+from datetime import datetime
 from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from UserModule.models import (
+    GenMembershipType, GenPersonRole, GenShift,
+    SecUser, GenPerson, GenMember
+)
 
-from UserModule.models import GenMembershipType, GenPersonRole, GenShift, SecUser, GenPerson, GenMember
+
+def safe_combine(date_part, time_part):
+    try:
+        if isinstance(date_part, str):
+            date_part = datetime.strptime(date_part, "%Y-%m-%d").date()
+        if isinstance(time_part, str):
+            time_part = datetime.strptime(time_part, "%H:%M:%S").time()
+        return datetime.combine(date_part, time_part)
+    except Exception:
+        return None
 
 
 class DataImportFromJsonConfigAPIView(APIView):
@@ -31,7 +44,7 @@ class DataImportFromJsonConfigAPIView(APIView):
             cursor.execute("SELECT ShiftID, ShiftDesc FROM Gen_Shift")
             for row in cursor.fetchall():
                 GenShift.objects.update_or_create(
-                    shift_id=row.ShiftID,
+                    id=row.ShiftID,
                     defaults={'shift_desc': row.ShiftDesc}
                 )
 
@@ -39,7 +52,7 @@ class DataImportFromJsonConfigAPIView(APIView):
             cursor.execute("SELECT RoleID, RoleDesc FROM Gen_PersonRole")
             for row in cursor.fetchall():
                 GenPersonRole.objects.update_or_create(
-                    role_id=row.RoleID,
+                    id=row.RoleID,
                     defaults={'role_desc': row.RoleDesc}
                 )
 
@@ -47,47 +60,52 @@ class DataImportFromJsonConfigAPIView(APIView):
             cursor.execute("SELECT MembershipTypeID, MembershipTypeDesc FROM Gen_MembershipType")
             for row in cursor.fetchall():
                 GenMembershipType.objects.update_or_create(
-                    membership_type_id=row.MembershipTypeID,
+                    id=row.MembershipTypeID,
                     defaults={'membership_type_desc': row.MembershipTypeDesc}
                 )
 
             # Import SecUser
             cursor.execute("""
                 SELECT UserID, PersonID, UserName, UPassword, IsAdmin, ShiftID, 
-                IsActive, CreationDate, CreationTime
+                       IsActive, CreationDate, CreationTime
                 FROM Sec_Users
             """)
             for row in cursor.fetchall():
-                creation_datetime = f"{row.CreationDate} {row.CreationTime}" if row.CreationDate and row.CreationTime else None
+                creation_datetime = safe_combine(row.CreationDate, row.CreationTime)
+                shift_instance = GenShift.objects.filter(id=row.ShiftID).first() if row.ShiftID else None
+                person_instance = GenPerson.objects.filter(id=row.PersonID).first() if row.PersonID else None
 
                 SecUser.objects.update_or_create(
-                    user_id=row.UserID,
+                    id=row.UserID,
                     defaults={
                         'username': row.UserName,
                         'password': row.UPassword,
                         'is_admin': row.IsAdmin,
-                        'shift_id': row.ShiftID,
+                        'shift': shift_instance,
                         'is_active': row.IsActive,
                         'creation_datetime': creation_datetime,
-                        'person_id': row.PersonID,
+                        'person': person_instance,
                     }
                 )
 
-            # Import GenPerson (images untouched)
+            # Import GenPerson
             cursor.execute("""
                 SELECT PersonID, FirstName, LastName, FullName, FatherName, Gender, NationalCode, 
-                Nidentity, PersonImage, ThumbnailImage, BirthDate, Tel, Mobile, Email, 
-                Education, Job, HasInsurance, InsuranceNo, InsStartDate, InsEndDate, PAddress, 
-                HasParrent, TeamName, ShiftID, UserID, CreationDate, CreationTime, Modifier, ModificationTime
+                       Nidentity, PersonImage, ThumbnailImage, BirthDate, Tel, Mobile, Email, 
+                       Education, Job, HasInsurance, InsuranceNo, InsStartDate, InsEndDate, PAddress, 
+                       HasParrent, TeamName, ShiftID, UserID, CreationDate, CreationTime, Modifier, ModificationTime
                 FROM Gen_Person
             """)
             for row in cursor.fetchall():
                 gender = {0: 'F', 1: 'M'}.get(row.Gender, 'O')
-                creation_datetime = f"{row.CreationDate} {row.CreationTime}" if row.CreationDate and row.CreationTime else None
-                modification_datetime = f"{row.ModificationTime}" if row.ModificationTime else None
+                creation_datetime = safe_combine(row.CreationDate, row.CreationTime)
+                modification_datetime = row.ModificationTime if row.ModificationTime else None
+
+                shift_instance = GenShift.objects.filter(id=row.ShiftID).first() if row.ShiftID else None
+                user_instance = SecUser.objects.filter(id=row.UserID).first() if row.UserID else None
 
                 GenPerson.objects.update_or_create(
-                    person_id=row.PersonID,
+                    id=row.PersonID,
                     defaults={
                         'first_name': row.FirstName,
                         'last_name': row.LastName,
@@ -96,8 +114,8 @@ class DataImportFromJsonConfigAPIView(APIView):
                         'gender': gender,
                         'national_code': row.NationalCode,
                         'nidentity': row.Nidentity,
-                        'person_image': row.PersonImage,            # 👈 untouched
-                        'thumbnail_image': row.ThumbnailImage,      # 👈 untouched
+                        'person_image': row.PersonImage,
+                        'thumbnail_image': row.ThumbnailImage,
                         'birth_date': row.BirthDate,
                         'tel': row.Tel,
                         'mobile': row.Mobile,
@@ -111,8 +129,8 @@ class DataImportFromJsonConfigAPIView(APIView):
                         'address': row.PAddress,
                         'has_parrent': row.HasParrent,
                         'team_name': row.TeamName,
-                        'shift_id': row.ShiftID,
-                        'user_id': row.UserID,
+                        'shift': shift_instance,
+                        'user': user_instance,
                         'creation_datetime': creation_datetime,
                         'modifier': row.Modifier,
                         'modification_datetime': modification_datetime,
@@ -129,21 +147,22 @@ class DataImportFromJsonConfigAPIView(APIView):
                 FROM Gen_Members
             """)
             for row in cursor.fetchall():
-                membership_datetime = f"{row.MembershipDate} {row.MembershipTime}" if row.MembershipDate and row.MembershipTime else None
-                modification_datetime = f"{row.Modificationtime}" if row.Modificationtime else None
+                membership_datetime = safe_combine(row.MembershipDate, row.MembershipTime)
+                modification_datetime = row.Modificationtime if row.Modificationtime else None
 
-                role_instance = GenPersonRole.objects.get(role_id=row.RoleID)
-                user_instance = SecUser.objects.get(user_id=row.UserID)
-                shift_instance = GenShift.objects.get(shift_id=row.ShiftID)
+                person_instance = GenPerson.objects.filter(id=row.PersonID).first() if row.PersonID else None
+                role_instance = GenPersonRole.objects.filter(id=row.RoleID).first() if row.RoleID else None
+                user_instance = SecUser.objects.filter(id=row.UserID).first() if row.UserID else None
+                shift_instance = GenShift.objects.filter(id=row.ShiftID).first() if row.ShiftID else None
 
                 GenMember.objects.update_or_create(
-                    member_id=row.MemberID,
+                    id=row.MemberID,
                     defaults={
                         'card_no': row.CardNo,
-                        'person_id': row.PersonID,
-                        'role_id': role_instance,
-                        'user_id': user_instance.user_id,
-                        'shift_id': shift_instance.shift_id,
+                        'person': person_instance,
+                        'role': role_instance,
+                        'user': user_instance,
+                        'shift': shift_instance,
                         'is_black_list': row.IsBlackList,
                         'box_radif_no': row.BoxRadifNo,
                         'has_finger': row.HasFinger,
@@ -164,8 +183,7 @@ class DataImportFromJsonConfigAPIView(APIView):
                     }
                 )
 
-            conn.close()
-            return Response({"message": "✅ Data imported successfully."})
+            return Response({"message": "Data imported successfully"}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": f"❌ Import failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return JsonResponse({"error": str(e)}, status=500)
