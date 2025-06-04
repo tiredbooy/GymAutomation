@@ -63,9 +63,15 @@ class DynamicAPIView(APIView):
 
         order_by = request.query_params.get('order_by')
         if order_by == 'latest':
-            queryset = queryset.order_by('-id')
+            if action in ['user', 'person']:
+                queryset = queryset.order_by('-creation_datetime')
+            else:
+                queryset = queryset.order_by('-id')
         elif order_by == 'earlier':
-            queryset = queryset.order_by('id')
+            if action in ['user', 'person']:
+                queryset = queryset.order_by('creation_datetime')
+            else:
+                queryset = queryset.order_by('id')
 
         try:
             page = int(request.query_params.get('page', 1))
