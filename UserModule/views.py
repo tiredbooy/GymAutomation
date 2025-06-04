@@ -54,7 +54,10 @@ class DynamicAPIView(APIView):
 
         for key, value in request.query_params.items():
             if key not in ['action', 'id', 'page', 'limit', 'order_by']:
-                filters &= Q(**{key: value})
+                if key == 'full_name':
+                    filters &= Q(full_name__icontains=value)
+                else:
+                    filters &= Q(**{key: value})
 
         queryset = model.objects.filter(filters)
 
