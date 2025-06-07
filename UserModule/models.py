@@ -29,7 +29,7 @@ class SecUser(models.Model):
     is_admin = models.BooleanField(default=False)
     shift = models.ForeignKey(GenShift, null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
     is_active = models.BooleanField(default=True)
-    creation_datetime = models.CharField(max_length=510, null=True, blank=True)
+    creation_datetime = models.DateTimeField(null=True, blank=True, auto_now_add=True)
 
     def __str__(self):
         return self.username or f"User {self.id}"
@@ -66,7 +66,7 @@ class GenPerson(models.Model):
     team_name = models.CharField(max_length=255, null=True, blank=True)
     shift = models.ForeignKey('GenShift', null=True, blank=True, on_delete=models.SET_NULL, related_name='people')
     user = models.ForeignKey('SecUser', null=True, blank=True, on_delete=models.SET_NULL, related_name='people_created')
-    creation_datetime = models.CharField(max_length=510, null=True, blank=True)
+    creation_datetime = models.DateTimeField(null=True, blank=True, auto_now_add=True)
     modifier = models.CharField(max_length=255, null=True, blank=True)
     modification_datetime = models.CharField(max_length=510, null=True, blank=True)
 

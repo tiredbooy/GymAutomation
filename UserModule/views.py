@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -62,15 +64,17 @@ class DynamicAPIView(APIView):
         queryset = model.objects.filter(filters)
 
         order_by = request.query_params.get('order_by')
-        if order_by == 'latest':
-            if action in ['user', 'person']:
+        use_creation_field = action in ['person', 'user']
+
+        if use_creation_field:
+            if order_by == 'latest':
                 queryset = queryset.order_by('-creation_datetime')
-            else:
-                queryset = queryset.order_by('-id')
-        elif order_by == 'earlier':
-            if action in ['user', 'person']:
+            elif order_by == 'earlier':
                 queryset = queryset.order_by('creation_datetime')
-            else:
+        else:
+            if order_by == 'latest':
+                queryset = queryset.order_by('-id')
+            elif order_by == 'earlier':
                 queryset = queryset.order_by('id')
 
         try:

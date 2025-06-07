@@ -71,7 +71,7 @@ class DataImportFromJsonConfigAPIView(APIView):
                 FROM Sec_Users
             """)
             for row in cursor.fetchall():
-                creation_datetime = safe_combine(row.CreationDate, row.CreationTime)
+                creation_datetime = safe_combine(row.CreationDate, row.CreationTime) or datetime.now()
                 shift_instance = GenShift.objects.filter(id=row.ShiftID).first() if row.ShiftID else None
                 person_instance = GenPerson.objects.filter(id=row.PersonID).first() if row.PersonID else None
 
@@ -98,7 +98,7 @@ class DataImportFromJsonConfigAPIView(APIView):
             """)
             for row in cursor.fetchall():
                 gender = {0: 'F', 1: 'M'}.get(row.Gender, 'O')
-                creation_datetime = safe_combine(row.CreationDate, row.CreationTime)
+                creation_datetime = safe_combine(row.CreationDate, row.CreationTime) or datetime.now()
                 modification_datetime = row.ModificationTime if row.ModificationTime else None
 
                 shift_instance = GenShift.objects.filter(id=row.ShiftID).first() if row.ShiftID else None
