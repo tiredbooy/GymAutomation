@@ -40,7 +40,6 @@ class GenPerson(models.Model):
         ('F', 'Female'),
         ('O', 'Other'),
     ]
-
     id = models.BigIntegerField(primary_key=True)
     first_name = models.CharField(max_length=255, null=True, blank=True)
     last_name = models.CharField(max_length=255, null=True, blank=True)
@@ -76,6 +75,7 @@ class GenPerson(models.Model):
 class GenMember(models.Model):
     id = models.BigIntegerField(primary_key=True)
     card_no = models.CharField(max_length=50, null=True, blank=True)
+    couch_id = models.IntegerField(null=True, blank=True)
     person = models.ForeignKey(GenPerson, null=True, blank=True, on_delete=models.SET_NULL, related_name='members')
     role = models.ForeignKey(GenPersonRole, null=True, blank=True, on_delete=models.SET_NULL, related_name='members')
     user = models.ForeignKey(SecUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='members_added')

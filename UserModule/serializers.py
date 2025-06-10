@@ -67,7 +67,7 @@ class GenMemberSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'card_no', 'person', 'role', 'user', 'shift', 'is_black_list', 'box_radif_no', 'has_finger',
             'membership_datetime', 'modifier', 'modification_datetime', 'is_family', 'max_debit',
-            'minutiae', 'minutiae2', 'minutiae3', 'salary',
+            'minutiae', 'minutiae2', 'minutiae3', 'salary', 'couch_id',
             'face_template_1', 'face_template_2', 'face_template_3', 'face_template_4', 'face_template_5',
             'section_left'
         ]
