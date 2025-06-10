@@ -31,6 +31,16 @@ class PaymentAPIView(APIView):
             if value is not None:
                 filters &= Q(**{f"{field}__icontains": value})
 
+        # Payment date range filter
+        start_date = request.query_params.get('start_payment_date')
+        end_date = request.query_params.get('end_payment_date')
+        if start_date and end_date:
+            filters &= Q(payment_date__range=[start_date, end_date])
+        elif start_date:
+            filters &= Q(payment_date__gte=start_date)
+        elif end_date:
+            filters &= Q(payment_date__lte=end_date)
+
         payments = Payment.objects.filter(filters)
 
         # Pagination

@@ -64,7 +64,7 @@ class DynamicAPIView(APIView):
         queryset = model.objects.filter(filters)
 
         order_by = request.query_params.get('order_by')
-        use_creation_field = action in ['person', 'user']
+        use_creation_field = action in ['person', 'user', 'member']
 
         if use_creation_field:
             if order_by == 'latest':

@@ -97,6 +97,8 @@ class GenMember(models.Model):
     face_template_3 = models.BinaryField(null=True, blank=True)
     face_template_4 = models.BinaryField(null=True, blank=True)
     face_template_5 = models.BinaryField(null=True, blank=True)
+    creation_datetime = models.DateTimeField(null=True, blank=True, auto_now_add=True)
+    section_left = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"Member {self.id} - {self.card_no}"
