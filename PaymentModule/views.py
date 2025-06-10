@@ -32,8 +32,8 @@ class PaymentAPIView(APIView):
                 filters &= Q(**{f"{field}__icontains": value})
 
         # Payment date range filter
-        start_date = request.query_params.get('start_payment_date')
-        end_date = request.query_params.get('end_payment_date')
+        start_date = request.query_params.get('from')
+        end_date = request.query_params.get('to')
         if start_date and end_date:
             filters &= Q(payment_date__range=[start_date, end_date])
         elif start_date:
