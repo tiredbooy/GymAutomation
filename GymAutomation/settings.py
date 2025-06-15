@@ -88,9 +88,9 @@ WSGI_APPLICATION = 'GymAutomation.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'GymAutomationRestoredDataBase',
+        'NAME': 'GymAutomation',
         'USER': 'postgres',
-        'PASSWORD': '138461011e',
+        'PASSWORD': 'mahdi09393591452',
         'HOST': 'localhost',
         'PORT': '5432',
     }
