@@ -64,18 +64,10 @@ class DynamicAPIView(APIView):
         queryset = model.objects.filter(filters)
 
         order_by = request.query_params.get('order_by')
-        use_creation_field = action in ['person', 'user']
-
-        if use_creation_field:
-            if order_by == 'latest':
-                queryset = queryset.order_by('-creation_datetime')
-            elif order_by == 'earlier':
-                queryset = queryset.order_by('creation_datetime')
-        else:
-            if order_by == 'latest':
-                queryset = queryset.order_by('-id')
-            elif order_by == 'earlier':
-                queryset = queryset.order_by('id')
+        if order_by == 'latest':
+            queryset = queryset.order_by('-id')
+        elif order_by == 'earlier':
+            queryset = queryset.order_by('id')
 
         try:
             page = int(request.query_params.get('page', 1))
